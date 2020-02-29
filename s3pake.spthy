@@ -1,0 +1,88 @@
+theory s3pake
+begin
+
+builtins: diffie-hellman
+
+functions: blind/2, unblind/2, G/3, Ha/3
+
+equations: unblind(blind(a, b), b) = a
+
+//защищенный канал для передачи пароля доверенному серверу
+rule In_S:
+    [ !Sec($A, $B, m) ]
+    --[
+        In_S($A, $B, m)
+    ]->
+    [ In_S($A, $B, m) ]
+
+rule Out_S:
+    [ Out_S($A, $B, m) ]
+    --[
+        Out_S($A, $B, m)
+    ]->
+    [ !Sec($A, $B, m) ]:
+
+//Генерация паролей пользователей при первом запуске протокола
+rule Secret_keys_registration:
+    [ Fr(~pw) ]
+    -->
+    [ !Ltk($client, ~pw)
+    , Out_S($client, $S, ~pw) ]
+
+//Моделирование протокола
+rule A_send_init_message:
+	let        
+        X = blind('g'^~x, ('g'^$ordM)^~pwA)
+    in    
+    [ !Ltk($A, ~pwA)
+    , Fr(~x) ]
+    --[ 
+        SendInitToB($A, X) 
+    ]->
+    [ Out(<$A, X>)
+    , St_A_1($A, ~x, ~pwA, X) ]
+
+rule B_receive_A_init_message:
+	let
+        Y = blind('g'^~y, ('g'^$ordN)^~pwB)
+    in	
+    [ !Ltk($B, ~pwB)
+    , Fr(~y)
+    , In(<$A, X>) ]
+    --[ 
+        SendInitToServer($A, X, $B, Y) 
+    ]->
+    [ Out(<$A, X, $B, Y>)
+    , St_B_1($B, ~y, ~pwB, Y, $A, X) ]
+
+/*
+использовать секретные каналы 
+https://tamarin-prover.github.io/manual/book/009_advanced-features.html
+*/
+rule S_receive_B_init_message:
+    let
+        un_X = unblind(X)
+        un_Y = unblind(Y)
+        S_X = blind(un_X^~z, G($B, $S, un_Y)^~pwB)
+        S_Y = blind(un_Y^~z, G($A, $S, un_X)^~pwA)
+    in
+    [ In_S($A, $S, ~pwA)
+    , In_S($B, $S, ~pwB)
+    , Fr(~z)
+    , In(<$A, X, $B, Y>) ]
+    -->
+    [ Out(<S_X, S_Y>) ]
+
+rule B_receive_answer_S:
+    [ St_B_1($B, ~y, ~pwB, Y, $A, X)
+    , In((<S_X, S_Y>)) ]
+    --[
+        
+    ]->
+    [  ]
+
+lemma executable:
+  exists-trace
+    "Ex A B X Y #i #j. SendInitToB(A, X) @i & SendInitToServer(A,X,B,Y) @j & i < j"
+
+end
