@@ -20,7 +20,7 @@ rule Out_S:
     --[
         Out_S($A, $B, m)
     ]->
-    [ !Sec($A, $B, m) ]:
+    [ !Sec($A, $B, m) ]
 
 //Генерация паролей пользователей при первом запуске протокола
 rule Secret_keys_registration:
@@ -61,9 +61,9 @@ https://tamarin-prover.github.io/manual/book/009_advanced-features.html
 */
 rule S_receive_B_init_message:
     let
-        g_power_x = unblind(X)
-        g_power_y = unblind(Y)
-        S_X = blind(un_X^~z, G($B, $S, g_power_y)^~pwB)
+        g_power_x = unblind(X, ('g'^$ordM)^~pwA)
+        g_power_y = unblind(Y, ('g'^$ordN)^~pwB)
+        S_X = blind(g_power_x^~z, G($B, $S, g_power_y)^~pwB)
         S_Y = blind(g_power_y^~z, G($A, $S, g_power_x)^~pwA)
     in
     [ In_S($A, $S, ~pwA)
