@@ -36,9 +36,7 @@ rule A_send_init_message:
     in    
     [ !Ltk($A, ~pwA)
     , Fr(~x) ]
-    --[ 
-        SendInitToB($A, X) 
-    ]->
+    -->
     [ Out(<$A, X>)
     , St_A_1($A, ~x, ~pwA, X) ]
 
@@ -49,16 +47,10 @@ rule B_receive_A_init_message:
     [ !Ltk($B, ~pwB)
     , Fr(~y)
     , In(<$A, X>) ]
-    --[ 
-        SendInitToServer($A, X, $B, Y) 
-    ]->
+    -->
     [ Out(<$A, X, $B, Y>)
     , St_B_1($B, ~y, ~pwB, Y, $A, X) ]
 
-/*
-использовать секретные каналы 
-https://tamarin-prover.github.io/manual/book/009_advanced-features.html
-*/
 rule S_receive_B_init_message:
     let
         g_power_x = unblind(X, ('g'^$ordM)^~pwA)
@@ -80,9 +72,7 @@ rule B_receive_answer_S:
     in
     [ St_B_1($B, ~y, ~pwB, Y, $A, X)
     , In(<S_X, S_Y>) ]
-    --[
-        SendAnswerToA(S_Y, alpha)
-    ]->
+    -->
     [ Out(<S_Y, alpha>)
     , St_B_2($B, ~y, ~pwB, g_power_xz) ]
 
@@ -95,7 +85,7 @@ rule A_receive_alpha_from_B:
     [ St_A_1($A, ~x, ~pwA, X)
     , In(<S_Y, alpha>) ]
     --[
-        
+        CreateSessionA($A, $B, SK)
     ]->
     [ Out(beta)
     , A_Session($A, $B, SK) ]
@@ -107,7 +97,7 @@ rule B_receive_beta_from_A:
     [ St_B_2($B, ~y, ~pwB, g_power_xz)
     , In(beta) ]
     --[
-        
+        CreateSessionB($A, $B, SK)
     ]->
     [ B_Session($A, $B, SK) ]
 
@@ -115,6 +105,6 @@ rule B_receive_beta_from_A:
 
 lemma executable:
   exists-trace
-    "Ex A B X Y #i #j. SendInitToB(A, X) @i & SendInitToServer(A,X,B,Y) @j & i < j"
+    "Ex A B SK #i #j. CreateSessionA(A, B, SK) @i & CreateSessionB(A, B, SK) @j & i < j"
 
 end
