@@ -61,10 +61,10 @@ https://tamarin-prover.github.io/manual/book/009_advanced-features.html
 */
 rule S_receive_B_init_message:
     let
-        un_X = unblind(X)
-        un_Y = unblind(Y)
-        S_X = blind(un_X^~z, G($B, $S, un_Y)^~pwB)
-        S_Y = blind(un_Y^~z, G($A, $S, un_X)^~pwA)
+        g_power_x = unblind(X)
+        g_power_y = unblind(Y)
+        S_X = blind(un_X^~z, G($B, $S, g_power_y)^~pwB)
+        S_Y = blind(g_power_y^~z, G($A, $S, g_power_x)^~pwA)
     in
     [ In_S($A, $S, ~pwA)
     , In_S($B, $S, ~pwB)
@@ -74,12 +74,44 @@ rule S_receive_B_init_message:
     [ Out(<S_X, S_Y>) ]
 
 rule B_receive_answer_S:
+	let
+        g_power_xz = unblind(S_X, G($B, $S, 'g'^~y)^~pwB)
+        alpha = G($A, $B, (g_power_xz)^~y)
+    in
     [ St_B_1($B, ~y, ~pwB, Y, $A, X)
-    , In((<S_X, S_Y>)) ]
+    , In(<S_X, S_Y>) ]
+    --[
+        SendAnswerToA(S_Y, alpha)
+    ]->
+    [ Out(<S_Y, alpha>)
+    , St_B_2($B, ~y, ~pwB, g_power_xz) ]
+
+rule A_receive_alpha_from_B:
+	let
+        g_power_yz = unblind(S_Y, G($A, $S, 'g'^~x)^~pwA)
+        beta = G($B, $A, g_power_yz^~x)
+        SK = Ha($A, $B, g_power_yz^~x)
+    in
+    [ St_A_1($A, ~x, ~pwA, X)
+    , In(<S_Y, alpha>) ]
     --[
         
     ]->
-    [  ]
+    [ Out(beta)
+    , A_Session($A, $B, SK) ]
+
+rule B_receive_beta_from_A:
+	let
+        SK = Ha($A, $B, g_power_xz^~y)
+    in
+    [ St_B_2($B, ~y, ~pwB, g_power_xz)
+    , In(beta) ]
+    --[
+        
+    ]->
+    [ B_Session($A, $B, SK) ]
+
+
 
 lemma executable:
   exists-trace
