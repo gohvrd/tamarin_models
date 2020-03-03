@@ -38,7 +38,7 @@ rule A_send_init_message:
     , Fr(~x) ]
     -->
     [ Out(<$A, X>)
-    , St_A_1($A, ~x, ~pwA, X) ]
+    , St_A_1(~x, ~pwA) ]
 
 rule B_receive_A_init_message:
 	let
@@ -49,7 +49,7 @@ rule B_receive_A_init_message:
     , In(<$A, X>) ]
     -->
     [ Out(<$A, X, $B, Y>)
-    , St_B_1($B, ~y, ~pwB, Y, $A, X) ]
+    , St_B_1(~y, ~pwB) ]
 
 rule S_receive_B_init_message:
     let
@@ -70,11 +70,11 @@ rule B_receive_answer_S:
         g_power_xz = unblind(S_X, G($B, $S, 'g'^~y)^~pwB)
         alpha = G($A, $B, (g_power_xz)^~y)
     in
-    [ St_B_1($B, ~y, ~pwB, Y, $A, X)
+    [ St_B_1(~y, ~pwB)
     , In(<S_X, S_Y>) ]
     -->
     [ Out(<S_Y, alpha>)
-    , St_B_2($B, ~y, ~pwB, g_power_xz) ]
+    , St_B_2(~y, g_power_xz) ]
 
 rule A_receive_alpha_from_B:
 	let
@@ -82,7 +82,7 @@ rule A_receive_alpha_from_B:
         beta = G($B, $A, g_power_yz^~x)
         SK = Ha($A, $B, g_power_yz^~x)
     in
-    [ St_A_1($A, ~x, ~pwA, X)
+    [ St_A_1(~x, ~pwA)
     , In(<S_Y, alpha>) ]
     --[
         CreateSessionA($A, $B, SK)
@@ -94,17 +94,15 @@ rule B_receive_beta_from_A:
 	let
         SK = Ha($A, $B, g_power_xz^~y)
     in
-    [ St_B_2($B, ~y, ~pwB, g_power_xz)
+    [ St_B_2(~y, g_power_xz)
     , In(beta) ]
     --[
         CreateSessionB($A, $B, SK)
     ]->
     [ B_Session($A, $B, SK) ]
 
-
-
 lemma executable:
   exists-trace
-    "Ex A B SK #i #j. CreateSessionA(A, B, SK) @i & CreateSessionB(A, B, SK) @j & i < j"
+    "Ex A B SK #i #j. CreateSessionA(A, B, SK) @i & CreateSessionB(A, B, SK) @j"
 
 end
