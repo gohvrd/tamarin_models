@@ -105,4 +105,5 @@ lemma executable:
   exists-trace
     "Ex A B SK #i #j. CreateSessionA(A, B, SK) @i & CreateSessionB(A, B, SK) @j"
 
+//попробуем добавить исходные леммы
 end
