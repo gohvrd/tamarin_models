@@ -11,14 +11,14 @@ equations: unblind(blind(a, b), b) = a
 rule In_S:
     [ !Sec($A, $B, m) ]
     --[
-        In_S($A, $B, m)
+        SecureIn($A, $B, m)
     ]->
     [ In_S($A, $B, m) ]
 
 rule Out_S:
     [ Out_S($A, $B, m) ]
     --[
-        Out_S($A, $B, m)
+        SecureOut($A, $B, m)
     ]->
     [ !Sec($A, $B, m) ]
 
@@ -32,78 +32,82 @@ rule Secret_keys_registration:
 //Моделирование протокола
 rule A_send_init_message:
 	let        
-        X = blind('g'^~x, ('g'^$ordM)^~pwA)
+        X = blind('g'^~x, ('g'^$ordM)^pwA)
     in    
-    [ !Ltk($A, ~pwA)
+    [ !Ltk(A, pwA)
     , Fr(~x) ]
     -->
-    [ Out(<$A, X>)
-    , St_A_1(~x, ~pwA) ]
+    [ Out(<A, X>)
+    , St_A_1(A, $B, ~x, pwA) ]
 
 rule B_receive_A_init_message:
 	let
-        Y = blind('g'^~y, ('g'^$ordN)^~pwB)
+        Y = blind('g'^~y, ('g'^$ordN)^pwB)
     in	
-    [ !Ltk($B, ~pwB)
+    [ !Ltk(B, pwB)
     , Fr(~y)
-    , In(<$A, X>) ]
+    , In(<A, X>) ]
     -->
-    [ Out(<$A, X, $B, Y>)
-    , St_B_1(~y, ~pwB) ]
+    [ Out(<A, X, B, Y>)
+    , St_B_1(A, B, ~y, pwB) ]
 
 rule S_receive_B_init_message:
     let
-        g_power_x = unblind(X, ('g'^$ordM)^~pwA)
-        g_power_y = unblind(Y, ('g'^$ordN)^~pwB)
-        S_X = blind(g_power_x^~z, G($B, $S, g_power_y)^~pwB)
-        S_Y = blind(g_power_y^~z, G($A, $S, g_power_x)^~pwA)
+        g_power_x = unblind(X, ('g'^$ordM)^pwA)
+        g_power_y = unblind(Y, ('g'^$ordN)^pwB)
+        S_X = blind(g_power_x^~z, G(B, $S, g_power_y)^pwB)
+        S_Y = blind(g_power_y^~z, G(A, $S, g_power_x)^pwA)
     in
-    [ In_S($A, $S, ~pwA)
-    , In_S($B, $S, ~pwB)
+    [ In_S(A, $S, pwA)
+    , In_S(B, $S, pwB)
     , Fr(~z)
-    , In(<$A, X, $B, Y>) ]
+    , In(<A, X, B, Y>) ]
     -->
     [ Out(<S_X, S_Y>) ]
 
 rule B_receive_answer_S:
 	let
-        g_power_xz = unblind(S_X, G($B, $S, 'g'^~y)^~pwB)
-        alpha = G($A, $B, (g_power_xz)^~y)
+        g_power_xz = unblind(S_X, G(B, $S, 'g'^y)^pwB)
+        alpha = G(A, B, (g_power_xz)^y)
     in
-    [ St_B_1(~y, ~pwB)
+    [ St_B_1(A, B, y, pwB)
     , In(<S_X, S_Y>) ]
     -->
     [ Out(<S_Y, alpha>)
-    , St_B_2(~y, g_power_xz) ]
+    , St_B_2(A, B, y, g_power_xz) ]
 
 rule A_receive_alpha_from_B:
 	let
-        g_power_yz = unblind(S_Y, G($A, $S, 'g'^~x)^~pwA)
-        beta = G($B, $A, g_power_yz^~x)
-        SK = Ha($A, $B, g_power_yz^~x)
+        g_power_yz = unblind(S_Y, G(A, $S, 'g'^x)^pwA)
+        beta = G(B, A, g_power_yz^x)
+        SK = Ha(A, B, g_power_yz^x)
     in
-    [ St_A_1(~x, ~pwA)
+    [ St_A_1(A, B, x, pwA)
     , In(<S_Y, alpha>) ]
     --[
-        CreateSessionA($A, $B, SK)
+        CreateSessionA(A, B, SK)
     ]->
     [ Out(beta)
-    , A_Session($A, $B, SK) ]
+    , A_Session(A, B, SK) ]
 
 rule B_receive_beta_from_A:
 	let
-        SK = Ha($A, $B, g_power_xz^~y)
+        SK = Ha(A, B, g_power_xz^y)
     in
-    [ St_B_2(~y, g_power_xz)
+    [ St_B_2(A, B, y, g_power_xz)
     , In(beta) ]
     --[
-        CreateSessionB($A, $B, SK)
+        CreateSessionB(A, B, SK)
     ]->
-    [ B_Session($A, $B, SK) ]
+    [ B_Session(A, B, SK) ]
 
 lemma executable:
   exists-trace
     "Ex A B SK #i #j. CreateSessionA(A, B, SK) @i & CreateSessionB(A, B, SK) @j"
 
 //попробуем добавить исходные леммы
+/*lemma for_auto_proving_1 [sources]:
+"
+    All id1 id2 pw #i . In_S(id1, id2, pw) @ i ==> (Ex #j . Out_S(id1, id2, pw) @ j) | (Ex #j . KU(pw) @ j & j < i)
+"*/
 end
