@@ -1,22 +1,22 @@
 theory s3pake
 begin
 
-builtins: diffie-hellman
+builtins: diffie-hellman, symmetric-encryption
 
-functions: blind/2, unblind/2, G/3, Ha/3
+functions: /*blind/2, unblind/2, */G/3, Ha/3
 
-equations: unblind(blind(a, b), b) = a
+//equations: unblind(blind(a, b), b) = a
 
 //защищенный канал для передачи пароля доверенному серверу
 rule In_S:
-    [ !Sec(id1, id2, m) ]
+    [ !Sec($id1, $id2, m) ]
     -->
-    [ In_S(id1, id2, m) ]
+    [ In_S($id1, $id2, m) ]
 
 rule Out_S:
-    [ Out_S(id1, id2, m) ]
+    [ Out_S($id1, $id2, m) ]
     -->
-    [ !Sec(id1, id2, m) ]
+    [ !Sec($id1, $id2, m) ]
 
 //Генерация паролей пользователей при первом запуске протокола
 /*rule Secret_keys_registration:
@@ -42,45 +42,45 @@ rule S_initializaton:
     --[
         
     ]->
-    [ St_S_1(~sid, $S, $A, $B, ~pwA, ~pwB) ]
+    [ St_S_1(~sid, ~pwA, ~pwB) ]
 
 rule A_send_init_message:
 	let
         pwA = fst(m)
         sid = snd(m)  
         M = 'g'^$ordM
-        X = blind('g'^~x, M^pwA)
+        X = senc('g'^~x, M^pwA)
     in    
     [ In_S($S, $A, m)
     , Fr(~x) ]
     -->
     [ Out(<$A, X>)
-    , St_A_1(sid, $A, $S, ~x, pwA) ]
+    , St_A_1(sid, ~x, pwA) ]
 
 rule B_receive_A_init_message:
 	let
         pwB = fst(m)
         sid = snd(m)
         N = 'g'^$ordN
-        Y = blind('g'^~y, N^pwB)
+        Y = senc('g'^~y, N^pwB)
     in	
     [ In_S($S, $B, m)
     , Fr(~y)
     , In(<$A, X>) ]
     -->
     [ Out(<$A, X, $B, Y>)
-    , St_B_1(sid, $B, $S, $A, ~y, pwB) ]
+    , St_B_1(sid, ~y, pwB) ]
 
 rule S_receive_B_init_message:
     let
         M = 'g'^$ordM
         N = 'g'^$ordN
-        g_power_x = unblind(X, M^pwA)
-        g_power_y = unblind(Y, N^pwB)
-        S_X = blind(g_power_x^~z, G($B, $S, g_power_y)^pwB)
-        S_Y = blind(g_power_y^~z, G($A, $S, g_power_x)^pwA)
+        g_power_x = sdec(X, M^pwA)
+        g_power_y = sdec(Y, N^pwB)
+        S_X = senc(g_power_x^~z, G($B, $S, g_power_y)^pwB)
+        S_Y = senc(g_power_y^~z, G($A, $S, g_power_x)^pwA)
     in
-    [ St_S_1(sid, $S, $A, $B, pwA, pwB)
+    [ St_S_1(sid, pwA, pwB)
     , Fr(~z)
     , In(<$A, X, $B, Y>) ]
     --[ ProcessingInit(X, Y, M, N, pwA, pwB) ]->
@@ -88,22 +88,22 @@ rule S_receive_B_init_message:
 
 rule B_receive_answer_S:
 	let
-        g_power_xz = unblind(S_X, G($B, $S, 'g'^y)^pwB)
-        alpha = G($A, $B, (g_power_xz)^y)
+        g_power_xz = sdec(S_X, G($B, $S, 'g'^~y)^pwB)
+        alpha = G($A, $B, (g_power_xz)^~y)
     in
-    [ St_B_1(sid, $B, $S, $A, y, pwB)
+    [ St_B_1(sid, ~y, pwB)
     , In(<S_X, S_Y>) ]
     -->
     [ Out(<S_Y, alpha>)
-    , St_B_2(sid, $B, $S, $A, y, pwB, g_power_xz) ]
+    , St_B_2(sid, ~y, pwB, g_power_xz) ]
 
 rule A_receive_alpha_from_B:
 	let
-        g_power_yz = unblind(S_Y, G($A, $S, 'g'^x)^pwA)
-        beta = G($B, $A, g_power_yz^x)
-        SK = Ha($A, $B, g_power_yz^x)
+        g_power_yz = sdec(S_Y, G($A, $S, 'g'^~x)^pwA)
+        beta = G($B, $A, g_power_yz^~x)
+        SK = Ha($A, $B, g_power_yz^~x)
     in
-    [ St_A_1(sid, $A, $S, x, pwA)
+    [ St_A_1(sid, ~x, pwA)
     , In(<S_Y, alpha>) ]
     --[
         CreateSessionA(sid, $A, $B, SK)
@@ -113,9 +113,9 @@ rule A_receive_alpha_from_B:
 
 rule B_receive_beta_from_A:
 	let
-        SK = Ha($A, $B, g_power_xz^y)
+        SK = Ha($A, $B, g_power_xz^~y)
     in
-    [ St_B_2(sid, $B, $S, $A, y, pwB, g_power_xz)
+    [ St_B_2(sid, ~y, pwB, g_power_xz)
     , In(beta) ]
     --[
         CreateSessionB(sid, $A, $B, SK)
