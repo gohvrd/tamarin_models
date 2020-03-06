@@ -9,100 +9,126 @@ equations: unblind(blind(a, b), b) = a
 
 //защищенный канал для передачи пароля доверенному серверу
 rule In_S:
-    [ !Sec($A, $B, m) ]
-    --[
-        In_S($A, $B, m)
-    ]->
-    [ In_S($A, $B, m) ]
+    [ !Sec(id1, id2, m) ]
+    -->
+    [ In_S(id1, id2, m) ]
 
 rule Out_S:
-    [ Out_S($A, $B, m) ]
-    --[
-        Out_S($A, $B, m)
-    ]->
-    [ !Sec($A, $B, m) ]
+    [ Out_S(id1, id2, m) ]
+    -->
+    [ !Sec(id1, id2, m) ]
 
 //Генерация паролей пользователей при первом запуске протокола
-rule Secret_keys_registration:
+/*rule Secret_keys_registration:
     [ Fr(~pw) ]
     -->
     [ !Ltk($client, ~pw)
-    , Out_S($client, $S, ~pw) ]
+    , Out_S($client, $S, ~pw) ]*/
+
+rule Gen_new_password:
+    [ Fr(~pw) ]
+    --[
+        
+    ]->
+    [ !Ltk($id, ~pw) ]
 
 //Моделирование протокола
+rule S_initializaton:
+    [ Fr(~sid)
+    , !Ltk($A, ~pwA)
+    , !Ltk($B, ~pwB)
+    , Out_S($S, $A, <~pwA, ~sid>)
+    , Out_S($S, $B, <~pwB, ~sid>) ]
+    --[
+        
+    ]->
+    [ St_S_1(~sid, $S, $A, $B, ~pwA, ~pwB) ]
+
 rule A_send_init_message:
-	let        
-        X = blind('g'^~x, ('g'^$ordM)^~pwA)
+	let
+        pwA = fst(m)
+        sid = snd(m)  
+        M = 'g'^$ordM
+        X = blind('g'^~x, M^pwA)
     in    
-    [ !Ltk($A, ~pwA)
+    [ In_S($S, $A, m)
     , Fr(~x) ]
     -->
     [ Out(<$A, X>)
-    , St_A_1(~x, ~pwA) ]
+    , St_A_1(sid, $A, $S, ~x, pwA) ]
 
 rule B_receive_A_init_message:
 	let
-        Y = blind('g'^~y, ('g'^$ordN)^~pwB)
+        pwB = fst(m)
+        sid = snd(m)
+        N = 'g'^$ordN
+        Y = blind('g'^~y, N^pwB)
     in	
-    [ !Ltk($B, ~pwB)
+    [ In_S($S, $B, m)
     , Fr(~y)
     , In(<$A, X>) ]
     -->
     [ Out(<$A, X, $B, Y>)
-    , St_B_1(~y, ~pwB) ]
+    , St_B_1(sid, $B, $S, $A, ~y, pwB) ]
 
 rule S_receive_B_init_message:
     let
-        g_power_x = unblind(X, ('g'^$ordM)^~pwA)
-        g_power_y = unblind(Y, ('g'^$ordN)^~pwB)
-        S_X = blind(g_power_x^~z, G($B, $S, g_power_y)^~pwB)
-        S_Y = blind(g_power_y^~z, G($A, $S, g_power_x)^~pwA)
+        M = 'g'^$ordM
+        N = 'g'^$ordN
+        g_power_x = unblind(X, M^pwA)
+        g_power_y = unblind(Y, N^pwB)
+        S_X = blind(g_power_x^~z, G($B, $S, g_power_y)^pwB)
+        S_Y = blind(g_power_y^~z, G($A, $S, g_power_x)^pwA)
     in
-    [ In_S($A, $S, ~pwA)
-    , In_S($B, $S, ~pwB)
+    [ St_S_1(sid, $S, $A, $B, pwA, pwB)
     , Fr(~z)
     , In(<$A, X, $B, Y>) ]
-    -->
+    --[ ProcessingInit(X, Y, M, N, pwA, pwB) ]->
     [ Out(<S_X, S_Y>) ]
 
 rule B_receive_answer_S:
 	let
-        g_power_xz = unblind(S_X, G($B, $S, 'g'^~y)^~pwB)
-        alpha = G($A, $B, (g_power_xz)^~y)
+        g_power_xz = unblind(S_X, G($B, $S, 'g'^y)^pwB)
+        alpha = G($A, $B, (g_power_xz)^y)
     in
-    [ St_B_1(~y, ~pwB)
+    [ St_B_1(sid, $B, $S, $A, y, pwB)
     , In(<S_X, S_Y>) ]
     -->
     [ Out(<S_Y, alpha>)
-    , St_B_2(~y, g_power_xz) ]
+    , St_B_2(sid, $B, $S, $A, y, pwB, g_power_xz) ]
 
 rule A_receive_alpha_from_B:
 	let
-        g_power_yz = unblind(S_Y, G($A, $S, 'g'^~x)^~pwA)
-        beta = G($B, $A, g_power_yz^~x)
-        SK = Ha($A, $B, g_power_yz^~x)
+        g_power_yz = unblind(S_Y, G($A, $S, 'g'^x)^pwA)
+        beta = G($B, $A, g_power_yz^x)
+        SK = Ha($A, $B, g_power_yz^x)
     in
-    [ St_A_1(~x, ~pwA)
+    [ St_A_1(sid, $A, $S, x, pwA)
     , In(<S_Y, alpha>) ]
     --[
-        CreateSessionA($A, $B, SK)
+        CreateSessionA(sid, $A, $B, SK)
     ]->
     [ Out(beta)
-    , A_Session($A, $B, SK) ]
+    , A_Session(sid, $A, $B, SK) ]
 
 rule B_receive_beta_from_A:
 	let
-        SK = Ha($A, $B, g_power_xz^~y)
+        SK = Ha($A, $B, g_power_xz^y)
     in
-    [ St_B_2(~y, g_power_xz)
+    [ St_B_2(sid, $B, $S, $A, y, pwB, g_power_xz)
     , In(beta) ]
     --[
-        CreateSessionB($A, $B, SK)
+        CreateSessionB(sid, $A, $B, SK)
     ]->
-    [ B_Session($A, $B, SK) ]
+    [ B_Session(sid, $A, $B, SK) ]
+
+lemma unblind_precomp [sources]:
+"
+    All X Y M N pwA pwB #i . ProcessingInit(X, Y, M, N, pwA, pwB) @ i ==> Ex #j . KU(pwA) @ j & KU(pwB) @ j & j < i
+"
 
 lemma executable:
   exists-trace
-    "Ex A B SK #i #j. CreateSessionA(A, B, SK) @i & CreateSessionB(A, B, SK) @j"
+    "Ex sid A B SK #i #j. CreateSessionA(sid, A, B, SK) @i & CreateSessionB(sid, A, B, SK) @j"
 
 end
