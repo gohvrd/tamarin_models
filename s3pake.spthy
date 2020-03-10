@@ -9,25 +9,33 @@ equations: unblind(blind(a, b), b) = a
 
 //защищенный канал для передачи пароля доверенному серверу
 rule In_S:
-    [ !Sec($A, $B, m) ]
+    [ !Sec($id1, $id2, m) ]
     --[
-        In_S($A, $B, m)
+        SecureIn($id1, $id2, m)
     ]->
-    [ In_S($A, $B, m) ]
+    [ In_S($id1, $id2, m) ]
 
 rule Out_S:
-    [ Out_S($A, $B, m) ]
+    [ Out_S($id1, $id2, m) ]
     --[
-        Out_S($A, $B, m)
+        SecureOut($id1, $id2, m)
     ]->
-    [ !Sec($A, $B, m) ]
+    [ !Sec($id1, $id2, m) ]
 
 //Генерация паролей пользователей при первом запуске протокола
 rule Secret_keys_registration:
     [ Fr(~pw) ]
     -->
-    [ !Ltk($client, ~pw)
-    , Out_S($client, $S, ~pw) ]
+    [ !Ltk($client, ~pw) ]
+
+//Инициализация клиентов и сервера
+rule A_init:
+    [ !Ltk(A, pwA)
+    , Fr(~x) ]
+    --[
+        
+    ]->
+    [ Out_S ]
 
 //Моделирование протокола
 rule A_send_init_message:
